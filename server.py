@@ -5,6 +5,7 @@ Run:  python3 server.py
 Then everyone on the same Wi-Fi opens the printed http://<ip>:8000 URL.
 """
 import json
+import os
 import random
 import secrets
 import socket
@@ -13,7 +14,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-PORT = 8000
+PORT = int(os.environ.get("PORT", 8000))
 STATIC_DIR = Path(__file__).parent
 LOBBY_TIMEOUT = 90  # seconds without polling before a player is dropped (lobby only)
 RECLAIM_AFTER = 8   # seconds of silence before a name can be reclaimed from another device
