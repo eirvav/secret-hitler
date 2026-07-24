@@ -169,12 +169,20 @@
   }
   .card-intel .names { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 24px; text-transform: uppercase; letter-spacing: .06em; line-height: 1.35; }
   .card-intel .names .h-tag { font-size: 13px; letter-spacing: .2em; opacity: .8; }
+  .card-intel .ci-warn {
+    margin-top: 9px; padding: 6px 4px 4px;
+    border-top: 1px solid color-mix(in srgb, var(--paper) 28%, transparent);
+    font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 11px;
+    letter-spacing: .15em; text-transform: uppercase; padding-left: .15em;
+    color: var(--orange); animation: warn-pulse 1.6s ease-in-out 3;
+  }
   #dealt .after { margin-top: 24px; display: grid; gap: 12px; }
 
   .phase { display: none; }
   .phase.active { display: block; }
 
   @keyframes drop { from { opacity: 0; transform: translateY(-14px); } to { opacity: 1; transform: none; } }
+  @keyframes warn-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
   @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
 </style>
 </head>
@@ -219,6 +227,7 @@
           <div class="card-intel" id="intelSlip" hidden>
             <div class="ci-title">Your conspirators</div>
             <div class="names" id="intelNames"></div>
+            <div class="ci-warn">You can only view this once</div>
           </div>
         </div>
       </div>
