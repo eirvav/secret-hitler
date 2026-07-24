@@ -10,8 +10,8 @@ Built as a single Python script with no external dependencies (standard library 
 2. Everyone else on the same Wi-Fi network opens the printed `http://<ip>:8000` URL on their phone.
 3. Each player enters their name and joins the room.
 4. Once 5–10 players have all marked themselves ready, roles are dealt automatically — liberals, fascists, and one Hitler, following the standard Secret Hitler player-count composition.
-5. Each player taps their own phone to privately reveal their role. Fascists also see who their fellow fascists and Hitler are.
-6. During the round, a player can hand their phone to another player and tap **Flip my card** — this reveals only their *party membership* (liberal/fascist), never their secret role, matching how in-person investigations work.
+5. Each player taps their own card once to privately reveal their role — illustrated Secret Hitler card art, not just text. Fascists also see who their fellow fascists and Hitler are. This reveal only works once: tap the card again and it flips shut for good.
+6. From then on, that same card shows only *party membership* (liberal/fascist) — never the role — so a player can safely hand their phone to another player during an in-person investigation.
 7. The round ends once every player votes **End game**, and the room resets to the lobby for the next round.
 
 ## Running it
@@ -24,23 +24,24 @@ The server prints a LAN URL (e.g. `http://192.168.1.42:8000`) for players to ope
 
 ## Screenshots
 
-| Enlistment | The Room (lobby) |
+| Join | The Room (lobby) |
 |---|---|
 | ![Join screen](screenshots/01-join.png) | ![Lobby with 5 players](screenshots/02-lobby.png) |
 
-| Dossier (hidden) | Role revealed |
+| Secret role card (unrevealed) | Role revealed (once) |
 |---|---|
-| ![Top secret dossier front](screenshots/03-dossier-front.png) | ![Liberal role revealed](screenshots/04-role-reveal.png) |
+| ![Secret role card, face down](screenshots/03-dossier-front.png) | ![Fascist role revealed, with conspirator names](screenshots/04-role-reveal.png) |
 
-| Investigation (party membership only) |
+| Party membership (safe to show an investigator) |
 |---|
-| ![Party membership card](screenshots/05-investigation.png) |
+| ![Party membership card](screenshots/05-membership-card.png) |
 
 ## Design notes
 
 - **No dependencies.** The server uses only Python's standard library (`http.server`, `threading`, `json`); the client is a single `index.html` with no JS framework.
 - **In-memory state.** Player roster and roles live in server memory behind a lock — there's no database, and everything resets when the process restarts.
 - **Reconnect-friendly.** Closing and reopening the page reconnects to the same seat using a token stored in `localStorage`; entering your exact name again reclaims your seat from a new device.
+- **Once-only role reveal.** The first flip shows the full illustrated role card; every flip after that shows the plain party-membership card instead, tracked per-device in `localStorage` so a refresh can't re-reveal the role.
 - **Player composition** follows the standard rules:
 
   | Players | Liberals | Fascists (+ Hitler) |
