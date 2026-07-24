@@ -131,36 +131,23 @@
   /* ---------- role card ---------- */
   .flip-zone { perspective: 1200px; margin-top: 26px; }
   .flipper {
-    position: relative; width: 100%; aspect-ratio: 5 / 7; cursor: pointer;
+    position: relative; width: 100%; aspect-ratio: 351.5 / 449.8; cursor: pointer;
     transform-style: preserve-3d; transition: transform .65s cubic-bezier(.4, .1, .2, 1);
   }
   .flipper.flipped { transform: rotateY(180deg); }
   .face {
     position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden;
-    border: 2.5px solid var(--ink); box-shadow: 6px 6px 0 var(--ink);
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    padding: 24px 18px; text-align: center;
+    box-shadow: 6px 6px 0 color-mix(in srgb, var(--ink) 30%, transparent);
   }
-  .face.front { background: var(--paper-dark); }
-  .face.front .eagle { font-size: 54px; margin-bottom: 14px; filter: grayscale(1) contrast(1.2); }
-  .face.front .top-secret {
-    font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 30px; letter-spacing: .24em;
-    padding: 6px 16px 4px; border: 3px double var(--stamp-red); color: var(--stamp-red);
-    transform: rotate(-6deg); text-transform: uppercase;
+  .face img { display: block; width: 100%; height: 100%; -webkit-user-select: none; user-select: none; }
+  .face.back { transform: rotateY(180deg); }
+  .intel-slip {
+    margin-top: 16px; background: var(--paper); border: 2.5px solid var(--ink);
+    box-shadow: 4px 4px 0 var(--ink); padding: 12px 14px 10px; text-align: center;
+    animation: drop .3s ease-out both;
   }
-  .face.back { transform: rotateY(180deg); color: var(--paper); }
-  .face.back.liberal { background: var(--liberal); }
-  .face.back.fascist { background: var(--orange-dark); }
-  .face.back.hitler  { background: var(--ink); box-shadow: 6px 6px 0 var(--orange-dark); }
-  .role-kicker { font-family: 'Oswald', sans-serif; letter-spacing: .34em; font-size: 12px; text-transform: uppercase; opacity: .8; padding-left: .34em; }
-  .role-name {
-    font-family: 'Oswald', sans-serif; font-weight: 700; text-transform: uppercase;
-    font-size: clamp(40px, 12vw, 54px); line-height: 1; margin: 10px 0 6px;
-  }
-  .face.back.hitler .role-name { color: var(--orange); }
-  .intel { margin-top: 18px; width: 100%; border-top: 1px solid color-mix(in srgb, var(--paper) 40%, transparent); padding-top: 14px; }
-  .intel .names { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 20px; text-transform: uppercase; letter-spacing: .06em; line-height: 1.35; }
-  .intel .names .h-tag { font-size: 12px; letter-spacing: .2em; opacity: .8; }
+  .intel-slip .names { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 20px; text-transform: uppercase; letter-spacing: .06em; line-height: 1.4; }
+  .intel-slip .names .h-tag { font-size: 12px; letter-spacing: .2em; opacity: .7; }
   #dealt .after { margin-top: 24px; display: grid; gap: 12px; }
 
   .phase { display: none; }
@@ -205,18 +192,12 @@
   <section id="dealt" class="phase">
     <div class="flip-zone">
       <div class="flipper" id="flipper">
-        <div class="face front">
-          <div class="eagle">🦅</div>
-          <div class="top-secret">Top Secret</div>
-        </div>
-        <div class="face back" id="roleFace">
-          <div class="role-kicker" id="roleKicker"></div>
-          <div class="role-name" id="roleName"></div>
-          <div class="intel" id="intel" hidden>
-            <div class="names" id="intelNames"></div>
-          </div>
-        </div>
+        <div class="face front"><img id="coverImg" alt="" draggable="false"></div>
+        <div class="face back"><img id="cardImg" alt="" draggable="false"></div>
       </div>
+    </div>
+    <div class="intel-slip" id="intelSlip" hidden>
+      <div class="names" id="intelNames"></div>
     </div>
     <div class="after">
       <button id="endGameBtn" class="ghost">End game</button>
@@ -300,35 +281,41 @@
     btn.classList.toggle('armed', s.you.ready);
   }
 
-  // The role card has two looks. The FULL look (secret role + fascist intel)
-  // is shown exactly once — the private first reveal. Every flip after that
-  // shows only the PARTY look, safe to hand to an investigating player:
-  // Hitler and fascists both read plain "Fascist", no names.
+  // One card slot, two documents. Until the once-only private reveal is
+  // used, the player holds the ROLE dossier (role backcover -> secret role
+  // art, fascists get an intel slip under the card). The moment it is
+  // flipped back face-down it becomes the MEMBERSHIP card (its own
+  // backcover -> party art only), safe to hand to an investigator:
+  // Hitler and fascists both show the plain fascist membership card.
+  const SVG = {
+    roleBack: 'svg/role.cards.backcover.svg',
+    role: r => `svg/role.cards(${r}).svg`,
+    memberBack: 'svg/membership.card.backcover.svg',
+    member: p => `svg/membership.cards(${p}).svg`,
+  };
   let seenKey = null;
   let showingFull = false;
+  const preloaded = new Set();
 
-  function roleFaceFull(you) {
-    $('roleFace').className = 'face back ' + you.role;
-    $('roleKicker').textContent = 'Your secret role';
-    $('roleName').textContent = you.role === 'hitler' ? 'Hitler' : you.role;
-    const intel = $('intel');
-    if (you.role === 'fascist') {
-      const k = you.knows || {};
-      const parts = (k.fellow_fascists || []).map(n => `${n} <span class="h-tag">FASCIST</span>`);
-      parts.push(`${k.hitler} <span class="h-tag">— HITLER</span>`);
-      $('intelNames').innerHTML = parts.join('<br>');
-      intel.hidden = false;
-    } else {
-      intel.hidden = true;
-    }
+  function preload(src) {
+    if (preloaded.has(src)) return;
+    preloaded.add(src);
+    new Image().src = src;
   }
 
-  function roleFaceParty(you) {
-    const party = you.role === 'liberal' ? 'liberal' : 'fascist';
-    $('roleFace').className = 'face back ' + party;
-    $('roleKicker').textContent = 'Party membership';
-    $('roleName').textContent = party;
-    $('intel').hidden = true;
+  function party(you) { return you.role === 'liberal' ? 'liberal' : 'fascist'; }
+
+  function facesRole(you) {
+    $('coverImg').src = SVG.roleBack;
+    $('cardImg').src = SVG.role(you.role);
+  }
+  function facesMember(you) {
+    $('coverImg').src = SVG.memberBack;
+    $('cardImg').src = SVG.member(party(you));
+  }
+  function setFaces(you) {
+    if (!showingFull && localStorage.getItem(seenKey)) facesMember(you);
+    else facesRole(you);
   }
 
   function renderDealt(s) {
@@ -337,11 +324,12 @@
       lastRound = s.round;
       showingFull = false;
       $('flipper').classList.remove('flipped');
+      $('intelSlip').hidden = true;
     }
     seenKey = 'sh_seen_' + TOKEN_KEY + '_r' + s.round;
     const you = s.you;
-    if (!showingFull && localStorage.getItem(seenKey)) roleFaceParty(you);
-    else roleFaceFull(you);
+    [SVG.roleBack, SVG.role(you.role), SVG.memberBack, SVG.member(party(you))].forEach(preload);
+    setFaces(you);
 
     const endBtn = $('endGameBtn');
     endBtn.textContent = you.end
@@ -404,20 +392,29 @@
     if (!you || !you.role) return;
     if (!f.classList.contains('flipped')) {
       if (!localStorage.getItem(seenKey)) {
-        roleFaceFull(you);
         showingFull = true;
         localStorage.setItem(seenKey, '1');
+        facesRole(you);
+        if (you.role === 'fascist') {
+          const k = you.knows || {};
+          const parts = (k.fellow_fascists || []).map(n => `${n} <span class="h-tag">FASCIST</span>`);
+          parts.push(`${k.hitler} <span class="h-tag">— HITLER</span>`);
+          $('intelNames').innerHTML = parts.join('<br>');
+          $('intelSlip').hidden = false;
+        }
       } else {
-        roleFaceParty(you);
+        facesMember(you);
       }
       f.classList.add('flipped');
     } else {
       f.classList.remove('flipped');
+      $('intelSlip').hidden = true;
       if (showingFull) {
         showingFull = false;
-        // swap to the party look only after the card has turned face-down
+        // swap documents only after the card has turned face-down: the new
+        // membership backcover is the visible cue that the secret is gone
         setTimeout(() => {
-          if (lastState && lastState.you && lastState.you.role) roleFaceParty(lastState.you);
+          if (lastState && lastState.you && lastState.you.role) facesMember(lastState.you);
         }, 700);
       }
     }

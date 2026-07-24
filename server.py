@@ -11,6 +11,7 @@ import secrets
 import socket
 import threading
 import time
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -146,6 +147,21 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
             self.wfile.write(html)
+            return
+        if path.startswith("/svg/"):
+            name = urllib.parse.unquote(path[len("/svg/"):])
+            file = STATIC_DIR / "svg" / name
+            if ("/" in name or ".." in name or not name.endswith(".svg")
+                    or not file.is_file()):
+                self.send_json({"error": "not_found"}, 404)
+                return
+            body = file.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "image/svg+xml")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "public, max-age=86400")
+            self.end_headers()
+            self.wfile.write(body)
             return
         if path == "/api/state":
             params = dict(kv.split("=", 1) for kv in query.split("&") if "=" in kv)
