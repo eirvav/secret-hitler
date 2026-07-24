@@ -18,7 +18,6 @@ from pathlib import Path
 PORT = int(os.environ.get("PORT", 8000))
 STATIC_DIR = Path(__file__).parent
 LOBBY_TIMEOUT = 90  # seconds without polling before a player is dropped (lobby only)
-RECLAIM_AFTER = 8   # seconds of silence before a name can be reclaimed from another device
 
 # players needed -> (liberals, regular fascists); Hitler is always +1
 COMPOSITION = {
@@ -70,7 +69,6 @@ def maybe_deal_locked():
     for p in players:
         p["role"] = "liberal"
         p["knows"] = {}
-        p["end"] = False
     hitler["role"] = "hitler"
     for f in fascists:
         f["role"] = "fascist"
@@ -92,7 +90,6 @@ def reset_locked():
         p["ready"] = False
         p["role"] = None
         p["knows"] = {}
-        p["end"] = False
         p["last_seen"] = now()
 
 
@@ -105,9 +102,7 @@ def public_state_locked(me):
         "count": len(players),
         "ready_count": sum(1 for p in players if p["ready"]),
         "valid_count": len(players) in COMPOSITION,
-        "end_count": sum(1 for p in players if p.get("end")),
-        "you": {"id": me["id"], "name": me["name"], "ready": me["ready"],
-                "end": me.get("end", False)},
+        "you": {"id": me["id"], "name": me["name"], "ready": me["ready"]},
     }
     if STATE["phase"] == "dealt" and me.get("role"):
         out["deal_id"] = STATE.get("deal_id")
@@ -194,11 +189,9 @@ class Handler(BaseHTTPRequestHandler):
                     ((t, p) for t, p in STATE["players"].items()
                      if p["name"].lower() == name.lower()), None)
                 if existing:
+                    # reclaim the seat unconditionally (trust game between
+                    # friends): the newest device wins, the old one drops out
                     old_token, player = existing
-                    if now() - player["last_seen"] < RECLAIM_AFTER:
-                        self.send_json({"error": "That name is taken by an active player."}, 409)
-                        return
-                    # reclaim the seat: same player, new device/token
                     del STATE["players"][old_token]
                     token = secrets.token_urlsafe(16)
                     player["last_seen"] = now()
@@ -214,7 +207,7 @@ class Handler(BaseHTTPRequestHandler):
                 token = secrets.token_urlsafe(16)
                 STATE["players"][token] = {
                     "id": STATE["next_id"], "name": name, "ready": False,
-                    "last_seen": now(), "role": None, "knows": {}, "end": False,
+                    "last_seen": now(), "role": None, "knows": {},
                 }
                 STATE["next_id"] += 1
                 self.send_json({"token": token})
@@ -235,10 +228,9 @@ class Handler(BaseHTTPRequestHandler):
                     maybe_deal_locked()
                 self.send_json(public_state_locked(me))
             elif self.path == "/api/endgame":
+                # any single player may cancel the round for everyone
                 if STATE["phase"] == "dealt":
-                    me["end"] = bool(body.get("end"))
-                    if all(p.get("end") for p in STATE["players"].values()):
-                        reset_locked()
+                    reset_locked()
                 self.send_json(public_state_locked(me))
             elif self.path == "/api/leave":
                 del STATE["players"][token]

@@ -375,12 +375,6 @@
     const you = s.you;
     [SVG.roleBack, SVG.role(you.role), SVG.memberBack, SVG.member(party(you))].forEach(preload);
     setFaces(you);
-
-    const endBtn = $('endGameBtn');
-    endBtn.textContent = you.end
-      ? `✓ Waiting to end — ${s.end_count}/${s.count}`
-      : `End game — ${s.end_count}/${s.count}`;
-    endBtn.classList.toggle('armed', !!you.end);
   }
 
   function render(s) {
@@ -470,8 +464,8 @@
   });
 
   $('endGameBtn').addEventListener('click', async () => {
-    const wantEnd = !(lastState && lastState.you.end);
-    try { render(await api('/api/endgame', { token, end: wantEnd })); }
+    if (!confirm('End the game? This cancels the round for EVERYONE.')) return;
+    try { render(await api('/api/endgame', { token })); }
     catch (e) { if (e && e.error === 'unknown_token') dropToJoin(); }
   });
 
