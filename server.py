@@ -81,6 +81,9 @@ def maybe_deal_locked():
         }
     STATE["phase"] = "dealt"
     STATE["round"] += 1
+    # unique per deal, so clients' "role already revealed" flags can never
+    # collide with a round number from before a server restart
+    STATE["deal_id"] = secrets.token_hex(4)
 
 
 def reset_locked():
@@ -107,6 +110,7 @@ def public_state_locked(me):
                 "end": me.get("end", False)},
     }
     if STATE["phase"] == "dealt" and me.get("role"):
+        out["deal_id"] = STATE.get("deal_id")
         out["you"]["role"] = me["role"]
         out["you"]["knows"] = me.get("knows", {})
     return out
