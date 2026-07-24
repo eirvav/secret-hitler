@@ -149,13 +149,21 @@
     -webkit-user-select: none; user-select: none;
   }
   .face.back { transform: rotateY(180deg); }
-  .intel-slip {
-    margin-top: 16px; background: var(--paper); border: 2.5px solid var(--ink);
-    box-shadow: 4px 4px 0 var(--ink); padding: 12px 14px 10px; text-align: center;
-    animation: drop .3s ease-out both;
+  .card-intel {
+    position: absolute; left: 5%; right: 5%; bottom: 4.5%;
+    background: color-mix(in srgb, var(--ink) 93%, transparent);
+    color: var(--paper); border: 2px solid var(--paper);
+    outline: 2px solid color-mix(in srgb, var(--ink) 93%, transparent);
+    padding: 12px 10px 11px; text-align: center;
+    animation: drop .35s .3s ease-out both;
   }
-  .intel-slip .names { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 20px; text-transform: uppercase; letter-spacing: .06em; line-height: 1.4; }
-  .intel-slip .names .h-tag { font-size: 12px; letter-spacing: .2em; opacity: .7; }
+  .card-intel .ci-title {
+    font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 11px;
+    letter-spacing: .32em; text-transform: uppercase; color: var(--orange);
+    padding-left: .32em; margin-bottom: 5px;
+  }
+  .card-intel .names { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 24px; text-transform: uppercase; letter-spacing: .06em; line-height: 1.35; }
+  .card-intel .names .h-tag { font-size: 13px; letter-spacing: .2em; opacity: .8; }
   #dealt .after { margin-top: 24px; display: grid; gap: 12px; }
 
   .phase { display: none; }
@@ -201,11 +209,14 @@
     <div class="flip-zone">
       <div class="flipper" id="flipper">
         <div class="face front"><img id="coverImg" alt="" draggable="false"></div>
-        <div class="face back"><img id="cardImg" alt="" draggable="false"></div>
+        <div class="face back">
+          <img id="cardImg" alt="" draggable="false">
+          <div class="card-intel" id="intelSlip" hidden>
+            <div class="ci-title">Your conspirators</div>
+            <div class="names" id="intelNames"></div>
+          </div>
+        </div>
       </div>
-    </div>
-    <div class="intel-slip" id="intelSlip" hidden>
-      <div class="names" id="intelNames"></div>
     </div>
     <div class="after">
       <button id="endGameBtn" class="ghost">End game</button>
@@ -303,6 +314,7 @@
   };
   let seenKey = null;
   let showingFull = false;
+  let closing = false; // role card is rotating face-down into the membership card
   const preloaded = new Set();
 
   function preload(src) {
@@ -322,8 +334,16 @@
     $('cardImg').src = SVG.member(party(you));
   }
   function setFaces(you) {
-    if (!showingFull && localStorage.getItem(seenKey)) facesMember(you);
-    else facesRole(you);
+    if (closing) {
+      // incoming cover is already the membership back; the role art keeps
+      // rotating out on the far face until the turn finishes
+      $('coverImg').src = SVG.memberBack;
+      $('cardImg').src = SVG.role(you.role);
+    } else if (!showingFull && localStorage.getItem(seenKey)) {
+      facesMember(you);
+    } else {
+      facesRole(you);
+    }
   }
 
   function renderDealt(s) {
@@ -331,6 +351,7 @@
     if (s.deal_id !== lastRound) {
       lastRound = s.deal_id;
       showingFull = false;
+      closing = false;
       $('flipper').classList.remove('flipped');
       $('intelSlip').hidden = true;
       // drop reveal flags from older deals so localStorage stays clean
@@ -424,10 +445,14 @@
       f.classList.remove('flipped');
       $('intelSlip').hidden = true;
       if (showingFull) {
+        // the card closes INTO the membership document: the incoming cover
+        // face is swapped right away so the role backcover never reappears,
+        // and the role art on the far face is replaced once it's hidden
         showingFull = false;
-        // swap documents only after the card has turned face-down: the new
-        // membership backcover is the visible cue that the secret is gone
+        closing = true;
+        $('coverImg').src = SVG.memberBack;
         setTimeout(() => {
+          closing = false;
           if (lastState && lastState.you && lastState.you.role) facesMember(lastState.you);
         }, 700);
       }
