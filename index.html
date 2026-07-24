@@ -148,6 +148,11 @@
     width: 127.13%; height: 120%; left: -13.57%; top: -10%;
     -webkit-user-select: none; user-select: none;
   }
+  /* the three role cards inset their art in a white frame (21.2% sides,
+     17.4% top, 17% bottom of the canvas) — zoom so the art fills the card */
+  .face img.art-fill {
+    width: 173.55%; height: 152.53%; left: -36.78%; top: -26.6%;
+  }
   .face.back { transform: rotateY(180deg); }
   .card-intel {
     position: absolute; left: 5%; right: 5%; bottom: 4.5%;
@@ -325,20 +330,25 @@
 
   function party(you) { return you.role === 'liberal' ? 'liberal' : 'fascist'; }
 
+  function setCardArt(src, fill) {
+    const img = $('cardImg');
+    img.src = src;
+    img.classList.toggle('art-fill', fill);
+  }
   function facesRole(you) {
     $('coverImg').src = SVG.roleBack;
-    $('cardImg').src = SVG.role(you.role);
+    setCardArt(SVG.role(you.role), true);
   }
   function facesMember(you) {
     $('coverImg').src = SVG.memberBack;
-    $('cardImg').src = SVG.member(party(you));
+    setCardArt(SVG.member(party(you)), false);
   }
   function setFaces(you) {
     if (closing) {
       // incoming cover is already the membership back; the role art keeps
       // rotating out on the far face until the turn finishes
       $('coverImg').src = SVG.memberBack;
-      $('cardImg').src = SVG.role(you.role);
+      setCardArt(SVG.role(you.role), true);
     } else if (!showingFull && localStorage.getItem(seenKey)) {
       facesMember(you);
     } else {
