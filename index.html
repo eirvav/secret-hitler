@@ -178,11 +178,54 @@
   }
   #dealt .after { margin-top: 24px; display: grid; gap: 12px; }
 
+  /* ---------- confirm dialog ---------- */
+  .scrim[hidden] { display: none; }
+  .scrim {
+    position: fixed; inset: 0; z-index: 30; display: flex;
+    align-items: center; justify-content: center; padding: 26px;
+    background: color-mix(in srgb, var(--ink) 80%, transparent);
+    animation: fade-in .16s ease-out both;
+  }
+  .dialog {
+    position: relative; width: min(350px, 100%); text-align: center;
+    background: var(--paper); color: var(--ink);
+    border: 3px solid var(--ink); box-shadow: 9px 9px 0 var(--ink);
+    padding: 26px 22px 22px;
+    animation: stamp-in .34s cubic-bezier(.18, 1.2, .35, 1) both;
+  }
+  .dialog::before {
+    content: ""; position: absolute; inset: 5px; pointer-events: none;
+    border: 1px solid color-mix(in srgb, var(--ink) 40%, transparent);
+  }
+  .dlg-kicker {
+    font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 10px;
+    letter-spacing: .38em; text-transform: uppercase; padding-left: .38em;
+    color: var(--orange-dark);
+  }
+  .dlg-title {
+    font-family: 'Oswald', sans-serif; font-weight: 700; text-transform: uppercase;
+    font-size: 34px; line-height: 1.02; letter-spacing: .01em; margin: 10px 0 0;
+  }
+  .dlg-body { font-style: italic; font-size: 15.5px; line-height: 1.45; margin-top: 10px; }
+  .dlg-stamp {
+    display: inline-block; margin-top: 16px; transform: rotate(-5deg);
+    font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 12px;
+    letter-spacing: .22em; text-transform: uppercase; padding: 4px 12px 2px;
+    color: var(--stamp-red); border: 2px double var(--stamp-red); opacity: .85;
+  }
+  .dlg-actions { display: grid; gap: 11px; margin-top: 22px; }
+  .dlg-actions button { font-size: 16px; }
+
   .phase { display: none; }
   .phase.active { display: block; }
 
   @keyframes drop { from { opacity: 0; transform: translateY(-14px); } to { opacity: 1; transform: none; } }
   @keyframes warn-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes stamp-in {
+    from { opacity: 0; transform: scale(1.16) rotate(-2.5deg); }
+    to { opacity: 1; transform: none; }
+  }
   @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
 </style>
 </head>
@@ -238,6 +281,20 @@
   </section>
 </div>
 
+<!-- CONFIRM DIALOG -->
+<div id="confirmScrim" class="scrim" hidden>
+  <div class="dialog" role="alertdialog" aria-labelledby="dlgTitle">
+    <div class="dlg-kicker">Ministry Notice</div>
+    <h2 class="dlg-title" id="dlgTitle">End the game?</h2>
+    <p class="dlg-body">The room closes for <em>everyone</em>. All players are returned to the front desk.</p>
+    <div class="dlg-stamp">Irreversible</div>
+    <div class="dlg-actions">
+      <button id="confirmYes">Yes, end it</button>
+      <button id="confirmNo" class="ghost">Keep playing</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (() => {
   const $ = id => document.getElementById(id);
@@ -255,6 +312,10 @@
   }
   let lastRound = null;
   let pollTimer = null;
+  let lastState = null;
+  let lastLobbyKey = null;
+  let showingFull = false;
+  let closing = false; // role card is rotating face-down into the membership card
 
   function showPhase(name) {
     for (const p of ['join', 'lobby', 'dealt']) $(p).classList.toggle('active', p === name);
@@ -275,14 +336,16 @@
   }
 
   function dropToJoin() {
-    token = null; lastRound = null;
+    token = null; lastRound = null; lastState = null; lastLobbyKey = null;
+    showingFull = false; closing = false;
     localStorage.removeItem(TOKEN_KEY);
     clearInterval(pollTimer); pollTimer = null;
+    $('flipper').classList.remove('flipped');
+    $('intelSlip').hidden = true;
+    $('confirmScrim').hidden = true;
     showPhase('join');
   }
 
-  let lastState = null;
-  let lastLobbyKey = null;
   function renderLobby(s) {
     showPhase('lobby');
     const key = JSON.stringify([s.players, s.you, s.count, s.ready_count]);
@@ -327,8 +390,6 @@
     member: p => `svg/membership.cards(${p}).svg`,
   };
   let seenKey = null;
-  let showingFull = false;
-  let closing = false; // role card is rotating face-down into the membership card
   const preloaded = new Set();
 
   function preload(src) {
@@ -472,10 +533,34 @@
     }
   });
 
+  // in-style confirm dialog; resolves true when the action is confirmed
+  function askConfirm() {
+    return new Promise(resolve => {
+      const scrim = $('confirmScrim');
+      const done = answer => {
+        scrim.hidden = true;
+        $('confirmYes').removeEventListener('click', yes);
+        $('confirmNo').removeEventListener('click', no);
+        scrim.removeEventListener('click', backdrop);
+        document.removeEventListener('keydown', key);
+        resolve(answer);
+      };
+      const yes = () => done(true);
+      const no = () => done(false);
+      const backdrop = e => { if (e.target === scrim) done(false); };
+      const key = e => { if (e.key === 'Escape') done(false); };
+      $('confirmYes').addEventListener('click', yes);
+      $('confirmNo').addEventListener('click', no);
+      scrim.addEventListener('click', backdrop);
+      document.addEventListener('keydown', key);
+      scrim.hidden = false;
+    });
+  }
+
   $('endGameBtn').addEventListener('click', async () => {
-    if (!confirm('End the game? This cancels the round for EVERYONE.')) return;
-    try { render(await api('/api/endgame', { token })); }
-    catch (e) { if (e && e.error === 'unknown_token') dropToJoin(); }
+    if (!await askConfirm()) return;
+    try { await api('/api/endgame', { token }); } catch (e) {}
+    dropToJoin(); // the room is gone; everyone else drops on their next poll
   });
 
   // --- boot ---

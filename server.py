@@ -84,13 +84,11 @@ def maybe_deal_locked():
     STATE["deal_id"] = secrets.token_hex(4)
 
 
-def reset_locked():
+def close_room_locked():
+    """End the round and close the room — every player returns to the
+    name screen and the next game starts from an empty room."""
+    STATE["players"].clear()
     STATE["phase"] = "lobby"
-    for p in STATE["players"].values():
-        p["ready"] = False
-        p["role"] = None
-        p["knows"] = {}
-        p["last_seen"] = now()
 
 
 def public_state_locked(me):
@@ -228,10 +226,9 @@ class Handler(BaseHTTPRequestHandler):
                     maybe_deal_locked()
                 self.send_json(public_state_locked(me))
             elif self.path == "/api/endgame":
-                # any single player may cancel the round for everyone
-                if STATE["phase"] == "dealt":
-                    reset_locked()
-                self.send_json(public_state_locked(me))
+                # any single player may end the round, which closes the room
+                close_room_locked()
+                self.send_json({"closed": True})
             elif self.path == "/api/leave":
                 del STATE["players"][token]
                 unstick_locked()
